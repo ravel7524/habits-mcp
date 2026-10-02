@@ -1,0 +1,6 @@
+# Copy this section into your personal Codex configuration only after review.
+# Replace the executable and private LAN address. These files are examples only.
+[mcp_servers.habits]
+command = "/ABSOLUTE/PATH/TO/.venv/bin/habits-mcp"
+args = ["--phone-bind", "192.168.1.50", "--phone-port", "8766"]
+# Official setup: https://learn.chatgpt.com/docs/extend/mcp?surface=cli

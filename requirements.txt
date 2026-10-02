@@ -1,0 +1,5 @@
+# Optional transport dependency. Core JSON validation uses only the standard library.
+# Version 2 uses the official SDK's snake_case server/types API.
+mcp==2.2.0
+# Direct dependency for the optional private phone bridge's local EC certificate.
+cryptography==50.0.2

@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+*.egg-info/
+release/
+.runtime/
+*.sqlite*
+*.db
+*.pem
+pairing-invite*.json
+.DS_Store

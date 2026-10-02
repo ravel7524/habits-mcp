@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:habits:academic-plan:1",
+  "title": "Habits academic plan proposal version 1",
+  "description": "A proposal for explicit app review. Payload must be at most 2 MiB UTF-8. IDs, references, IANA zones, civil-time DST validity and deadline ordering are also checked by the validator. Never infer missing source dates.",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "habits.academic-plan"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "proposalID": {
+      "$ref": "#/$defs/uuid"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "not": {
+        "pattern": "[\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb\ud804\udcbd\ud804\udccd\ud80d\udc30-\ud80d\udc3f\ud82f\udca0-\ud82f\udca3\ud834\udd73-\ud834\udd7a\udb40\udc01\udb40\udc20-\udb40\udc7f]"
+      }
+    },
+    "semester": {
+      "$ref": "#/$defs/semester"
+    },
+    "courses": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/course"
+      }
+    },
+    "assessments": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/assessment"
+      }
+    },
+    "preparationTasks": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/preparationTask"
+      }
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "proposalID",
+    "source",
+    "semester",
+    "courses",
+    "assessments",
+    "preparationTasks"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "not": {
+        "pattern": "[\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb\ud804\udcbd\ud804\udccd\ud80d\udc30-\ud80d\udc3f\ud82f\udca0-\ud82f\udca3\ud834\udd73-\ud834\udd7a\udb40\udc01\udb40\udc20-\udb40\udc7f]"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4000,
+      "not": {
+        "pattern": "[\u0000-\b\u000b-\f\u000e-\u001f\u007f-\u009f\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb\ud804\udcbd\ud804\udccd\ud80d\udc30-\ud80d\udc3f\ud82f\udca0-\ud82f\udca3\ud834\udd73-\ud834\udd7a\udb40\udc01\udb40\udc20-\udb40\udc7f]"
+      }
+    },
+    "civilDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "civilTime": {
+      "type": "string",
+      "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "semester": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "startDate": {
+          "$ref": "#/$defs/civilDate"
+        },
+        "weekCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 52
+        },
+        "timeZoneIdentifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^(?:UTC|[A-Za-z0-9._+-]+(?:/[A-Za-z0-9._+-]+)+)$",
+          "description": "IANA time-zone identifier available in the validator runtime."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "startDate",
+        "weekCount",
+        "timeZoneIdentifier"
+      ],
+      "additionalProperties": false
+    },
+    "course": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "$ref": "#/$defs/title"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "assessment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "courseID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "exam",
+            "presentation",
+            "essay",
+            "deadline"
+          ]
+        },
+        "dueDate": {
+          "$ref": "#/$defs/civilDate"
+        },
+        "dueTime": {
+          "$ref": "#/$defs/civilTime"
+        },
+        "notes": {
+          "$ref": "#/$defs/notes"
+        }
+      },
+      "required": [
+        "id",
+        "courseID",
+        "title",
+        "kind",
+        "dueDate",
+        "notes"
+      ],
+      "additionalProperties": false
+    },
+    "preparationTask": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "assessmentID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "dueDate": {
+          "$ref": "#/$defs/civilDate"
+        },
+        "dueTime": {
+          "$ref": "#/$defs/civilTime"
+        },
+        "estimatedWorkMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "notes": {
+          "$ref": "#/$defs/notes"
+        }
+      },
+      "required": [
+        "id",
+        "assessmentID",
+        "title",
+        "estimatedWorkMinutes",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "dueTime": [
+          "dueDate"
+        ]
+      }
+    }
+  }
+}

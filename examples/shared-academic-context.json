@@ -1,0 +1,45 @@
+{
+  "format": "habits.academic-context",
+  "version": 1,
+  "capturedAt": "2026-10-02T12:00:00.123456789Z",
+  "semesters": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "title": "Autumn 2026",
+      "startDate": "2026-09-14",
+      "weekCount": 14,
+      "timeZoneIdentifier": "Europe/Zurich",
+      "courses": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Microeconomics"
+        },
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Statistics"
+        }
+      ],
+      "existingAssessments": [
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "courseID": "33333333-3333-4333-8333-333333333333",
+          "title": "Microeconomics exam",
+          "kind": "exam",
+          "dueDate": "2026-12-16",
+          "dueTime": "09:00",
+          "notes": "Example exam date and time supplied by the user.",
+          "state": "pending"
+        },
+        {
+          "id": "66666666-6666-4666-8666-666666666666",
+          "courseID": "44444444-4444-4444-8444-444444444444",
+          "title": "Statistics exam",
+          "kind": "exam",
+          "dueDate": "2026-12-18",
+          "notes": "Example date supplied by the user; time is not known. Recorded as completed.",
+          "state": "completed"
+        }
+      ]
+    }
+  ]
+}

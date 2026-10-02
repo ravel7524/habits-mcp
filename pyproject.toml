@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools==82.0.1", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "habits-desktop-mcp"
+version = "0.1.0"
+description = "Local MCP academic proposals and a private paired-phone review bridge"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["mcp==2.2.0", "cryptography==50.0.2"]
+
+[project.urls]
+Homepage = "https://github.com/ravel7524/habits-mcp"
+Repository = "https://github.com/ravel7524/habits-mcp"
+Issues = "https://github.com/ravel7524/habits-mcp/issues"
+
+[project.scripts]
+habits-mcp = "habits_mcp.desktop_cli:main"
+
+[tool.setuptools]
+packages = ["habits_mcp"]
+include-package-data = false
+
+[tool.setuptools.package-dir]
+habits_mcp = "."
+
+[tool.setuptools.package-data]
+habits_mcp = ["*.schema.json", "examples/*.json", "client-configs/*.toml", "client-configs/*.json"]

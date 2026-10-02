@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "habits": {
+      "command": "/ABSOLUTE/PATH/TO/.venv/bin/habits-mcp",
+      "args": ["--phone-bind", "192.168.1.50", "--phone-port", "8766"]
+    }
+  }
+}
