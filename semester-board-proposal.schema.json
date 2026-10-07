@@ -1,0 +1,322 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "habits.semester-board-proposal"
+    },
+    "version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "proposalID": {
+      "$ref": "#/$defs/uuid"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "not": {
+        "pattern": "[\u0000-\u001f-­؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻𑂽𑃍𓐰-𓐿𛲠-𛲣𝅳-𝅺󠀁󠀠-󠁿]"
+      }
+    },
+    "expectedBoardDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "semester": {
+      "$ref": "#/$defs/semester"
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "proposalID",
+    "source",
+    "semester"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:habits:semester-board-proposal:1",
+  "title": "Reviewed additive/update-only Semester Board proposal",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "not": {
+        "pattern": "[\u0000-\u001f-­؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻𑂽𑃍𓐰-𓐿𛲠-𛲣𝅳-𝅺󠀁󠀠-󠁿]"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4000,
+      "not": {
+        "pattern": "[\u0000-\b\u000b-\f\u000e-\u001f-­؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿￹-￻𑂽𑃍𓐰-𓐿𛲠-𛲣𝅳-𝅺󠀁󠀠-󠁿]"
+      }
+    },
+    "civilDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "civilTime": {
+      "type": "string",
+      "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "$ref": "#/$defs/title"
+        },
+        "colorHex": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "colorHex"
+      ],
+      "additionalProperties": false
+    },
+    "weekEntry": {
+      "type": "object",
+      "properties": {
+        "statusID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "$ref": "#/$defs/notes"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "assessment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "kind": {
+          "enum": [
+            "exam",
+            "presentation",
+            "essay",
+            "deadline"
+          ]
+        },
+        "dueDate": {
+          "$ref": "#/$defs/civilDate"
+        },
+        "dueTime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/civilTime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "$ref": "#/$defs/notes"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "completed",
+            "dismissed"
+          ]
+        },
+        "completedAt": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Finite Foundation seconds since 2001-01-01 UTC; never invent a completion timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "dueDate"
+      ],
+      "additionalProperties": false
+    },
+    "course": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "$ref": "#/$defs/title"
+        },
+        "activeWeeks": {
+          "type": "array",
+          "maxItems": 52,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52
+          },
+          "description": "Omitted means no source schedule recorded; supplied empty array explicitly means no active weeks. Never synthesize defaults."
+        },
+        "entries": {
+          "type": "object",
+          "maxProperties": 52,
+          "propertyNames": {
+            "pattern": "^(?:[1-9]|[1-4][0-9]|5[0-2])$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/weekEntry"
+          }
+        },
+        "moduleCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "sourceURL": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048
+        },
+        "scheduleNote": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/notes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assessments": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/assessment"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "entries"
+      ],
+      "additionalProperties": false
+    },
+    "semester": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 3,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "weekCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 52
+        },
+        "statuses": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/status"
+          }
+        },
+        "courses": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/course"
+          }
+        },
+        "startDate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/civilDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endDate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/civilDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "showExamWeeks": {
+          "type": "boolean"
+        },
+        "timeZoneIdentifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "title",
+        "weekCount",
+        "statuses",
+        "courses"
+      ],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "startDate": [
+          "endDate"
+        ],
+        "endDate": [
+          "startDate"
+        ]
+      }
+    }
+  },
+  "description": "At most 2 MiB; unknown/device fields forbidden. Missing fields/records survive merge. Existing semester requires its phone-shared digest. New boards receive full source-zone DST checks; existing-digest clock acceptance is structural only and the phone validates new/changed deadlines and timezone changes against merged source state."
+}

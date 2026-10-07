@@ -7,7 +7,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 ROOT = Path(__file__).resolve().parent
 
 
@@ -24,6 +24,8 @@ def build_source_release(wheel: Path, output: Path) -> dict:
     allowed += [ROOT / "README.md", ROOT / "requirements.txt", ROOT / "pyproject.toml", ROOT / ".gitignore"]
     allowed += list((ROOT / "examples").glob("*.json"))
     allowed += list((ROOT / "client-configs").glob("*.json")) + list((ROOT / "client-configs").glob("*.toml"))
+    allowed += list((ROOT / "tests").glob("test_*.py"))
+    allowed += list((ROOT / "docs" / "verification").glob("*.md"))
     source = output / f"habits-desktop-mcp-{VERSION}-source.zip"
     prefix = f"habits-desktop-mcp-{VERSION}"
     with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_DEFLATED) as archive:

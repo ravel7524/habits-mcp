@@ -21,6 +21,7 @@ from .validator import (
     MAX_BYTES, NOTES_LIMIT, TITLE_LIMIT, PlanValidationError, _array, _civil_instant,
     _date, _deadline, _integer, _object, _read, _string, _uuid, _zone, validate_plan,
 )
+from .board_validator import BOARD_FORMAT, PLAN_FORMAT, normalize_board_ids, validate_board_context, validate_capabilities
 
 PAIRING_SECONDS = 600
 CLOCK_SKEW_SECONDS = 120
@@ -51,6 +52,12 @@ def normalized_plan(value: Any) -> tuple[dict[str, Any], bytes, str]:
                 item[field] = _uuid(item[field], field)
     encoded = canonical_json(plan)
     return plan, encoded, hashlib.sha256(encoded).hexdigest()
+
+
+def normalized_board(value: Any) -> tuple[dict[str, Any], bytes, str]:
+    plan = normalize_board_ids(_read(value))
+    body = canonical_json(plan)
+    return plan, body, hashlib.sha256(body).hexdigest()
 
 
 def private_bind(value: str) -> str:
@@ -176,19 +183,26 @@ class DesktopBridge:
         os.chmod(self.db_path, 0o600)
         with self.connection() as database:
             version = database.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise BridgeError("unsupported bridge storage version; files were preserved")
             database.executescript("""
                 CREATE TABLE IF NOT EXISTS devices(device_id TEXT PRIMARY KEY, name TEXT NOT NULL, secret BLOB NOT NULL, paired_at REAL NOT NULL, last_seen REAL, revoked_at REAL);
                 CREATE TABLE IF NOT EXISTS invites(code_hash TEXT PRIMARY KEY, expires_at REAL NOT NULL, used INTEGER NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS nonces(device_id TEXT NOT NULL REFERENCES devices(device_id), nonce TEXT NOT NULL, timestamp REAL NOT NULL, PRIMARY KEY(device_id,nonce));
-                CREATE TABLE IF NOT EXISTS proposals(proposal_id TEXT PRIMARY KEY, digest TEXT NOT NULL, body BLOB NOT NULL, created_at REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS proposals(proposal_id TEXT PRIMARY KEY, digest TEXT NOT NULL, body BLOB NOT NULL, created_at REAL NOT NULL, format TEXT NOT NULL DEFAULT 'habits.academic-plan', version INTEGER NOT NULL DEFAULT 1);
                 CREATE TABLE IF NOT EXISTS deliveries(proposal_id TEXT NOT NULL REFERENCES proposals(proposal_id), device_id TEXT NOT NULL REFERENCES devices(device_id), state TEXT NOT NULL, detail TEXT, updated_at REAL NOT NULL, PRIMARY KEY(proposal_id,device_id));
                 CREATE TABLE IF NOT EXISTS contexts(device_id TEXT PRIMARY KEY REFERENCES devices(device_id), body BLOB NOT NULL, captured_at TEXT NOT NULL, received_at REAL NOT NULL);
-                PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS board_contexts(device_id TEXT PRIMARY KEY REFERENCES devices(device_id), body BLOB NOT NULL, captured_at TEXT NOT NULL, received_at REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS capabilities(device_id TEXT PRIMARY KEY REFERENCES devices(device_id), body BLOB NOT NULL);
             """)
             if "revoked_at" not in {row[1] for row in database.execute("PRAGMA table_info(devices)")}:
                 database.execute("ALTER TABLE devices ADD COLUMN revoked_at REAL")
+            columns = {row[1] for row in database.execute("PRAGMA table_info(proposals)")}
+            if "format" not in columns:
+                database.execute("ALTER TABLE proposals ADD COLUMN format TEXT NOT NULL DEFAULT 'habits.academic-plan'")
+            if "version" not in columns:
+                database.execute("ALTER TABLE proposals ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+            database.execute("PRAGMA user_version=2")
         from .phone_tls import ensure_certificate
         self.certificate_path, self.key_path, self.certificate_sha256 = ensure_certificate(self.data_dir, self.bind)
 
@@ -215,6 +229,11 @@ class DesktopBridge:
     def desktop_status(self) -> dict[str, Any]:
         with self.connection() as database:
             devices = [{"deviceID": row["device_id"], "deviceName": row["name"], "lastSeen": utc_string(row["last_seen"]) if row["last_seen"] else None} for row in database.execute("SELECT device_id,name,last_seen FROM devices WHERE revoked_at IS NULL ORDER BY device_id")]
+            for device in devices:
+                row = database.execute("SELECT body FROM capabilities WHERE device_id=?", (device["deviceID"],)).fetchone()
+                caps = json.loads(row["body"]) if row else None
+                device["platform"] = caps["platform"] if caps else "unknown"
+                device["proposalFormats"] = caps["proposalFormats"] if caps else [{"format": PLAN_FORMAT, "version": 1}]
             pending = database.execute("SELECT COUNT(*) FROM deliveries JOIN devices USING(device_id) WHERE state='pending' AND revoked_at IS NULL").fetchone()[0]
         return {"status": "desktop_ready", "baseURL": self.base_url, "certificateSHA256": self.certificate_sha256, "pairedDevices": devices, "pendingProposalCount": pending, "message": "Local desktop bridge. Plans remain pending until a paired phone reports user-confirmed application; phone connectivity is not guaranteed."}
 
@@ -244,6 +263,7 @@ class DesktopBridge:
             if consumed != 1:
                 raise BridgeError("invalid or expired pairing invite", 401)
             database.execute("INSERT INTO devices(device_id,name,secret,paired_at,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET name=excluded.name,secret=excluded.secret,paired_at=excluded.paired_at,last_seen=excluded.last_seen,revoked_at=NULL", (device, name, secret, now, now))
+            database.execute("DELETE FROM capabilities WHERE device_id=?", (device,))
         return {"deviceID": device, "deviceSecret": secret.hex()}
 
     def authenticate(self, method: str, path: str, body: bytes, headers: Any) -> str:
@@ -298,11 +318,53 @@ class DesktopBridge:
     def stage_academic_plan(self, proposal: Any, target_device_id: str | None = None) -> dict[str, Any]:
         target = self.target_device(target_device_id)
         plan, body, digest = normalized_plan(proposal)
+        return self._stage(plan, body, digest, target, PLAN_FORMAT)
+
+    def _require_board_capability(self, device: str) -> None:
+        self.target_device(device)
+        with self.connection() as database:
+            row = database.execute("SELECT body FROM capabilities WHERE device_id=?", (device,)).fetchone()
+        caps = json.loads(row["body"]) if row else None
+        if caps is None or caps["platform"] != "android" or {"format": BOARD_FORMAT, "version": 1} not in caps["proposalFormats"]:
+            raise BridgeError("this phone has not advertised Android Semester Board proposal version 1 support", 409)
+
+    def register_capabilities(self, device: str, value: Any) -> dict[str, Any]:
+        self.target_device(device)
+        caps = validate_capabilities(value)
+        with self.connection() as database:
+            database.execute("INSERT INTO capabilities VALUES(?,?) ON CONFLICT(device_id) DO UPDATE SET body=excluded.body", (device, canonical_json(caps)))
+        return {"status": "capabilities_registered", "deviceID": device, "platform": caps["platform"], "proposalFormats": caps["proposalFormats"]}
+
+    def stage_semester_board(self, proposal: Any, target_device_id: str | None = None) -> dict[str, Any]:
+        if target_device_id is None:
+            raise BridgeError("Semester Board proposals require an explicit capable targetDeviceID")
+        target = self.target_device(target_device_id)
+        self._require_board_capability(target)
+        plan, body, digest = normalized_board(proposal)
+        with self.connection() as database:
+            previous = database.execute("SELECT p.digest FROM proposals p JOIN deliveries d ON p.proposal_id=d.proposal_id WHERE p.proposal_id=? AND d.device_id=?", (plan["proposalID"], target)).fetchone()
+        if previous is not None:
+            # Consumed replay cannot become dependent on a newer context snapshot.
+            return self._stage(plan, body, digest, target, BOARD_FORMAT)
+        if "expectedBoardDigest" in plan:
+            shared = self.get_shared_semester_board_context(target)["context"]
+            if shared is None or _uuid(shared["semester"]["id"], "context.semester.id") != plan["semester"]["id"] or shared["boardDigest"] != plan["expectedBoardDigest"]:
+                raise BridgeError("expectedBoardDigest must come from this phone's explicitly shared selected board context", 409)
+        return self._stage(plan, body, digest, target, BOARD_FORMAT)
+
+    def _stage(self, plan: dict[str, Any], body: bytes, digest: str, target: str, proposal_format: str) -> dict[str, Any]:
         if len(canonical_json({"proposals": [{"proposal": plan, "proposalDigest": digest, "status": "pending"}]})) > MAX_RESPONSE_BYTES:
             raise BridgeError("proposal plus phone delivery envelope exceeds 2 MiB; reduce proposal text before staging", 413)
         identifier = plan["proposalID"]
         with self.connection() as database:
             database.execute("BEGIN IMMEDIATE")
+            if database.execute("SELECT 1 FROM devices WHERE device_id=? AND revoked_at IS NULL", (target,)).fetchone() is None:
+                raise BridgeError("targetDeviceID must identify an active paired device", 404)
+            if proposal_format == BOARD_FORMAT:
+                row = database.execute("SELECT body FROM capabilities WHERE device_id=?", (target,)).fetchone()
+                caps = json.loads(row["body"]) if row else None
+                if caps is None or caps["platform"] != "android" or {"format": BOARD_FORMAT, "version": 1} not in caps["proposalFormats"]:
+                    raise BridgeError("target capability changed before board staging; refresh the phone", 409)
             old = database.execute("SELECT digest FROM proposals WHERE proposal_id=?", (identifier,)).fetchone()
             if old and old["digest"] != digest:
                 raise BridgeError("proposalID already identifies different immutable content; use a fresh proposal UUID", 409)
@@ -311,15 +373,19 @@ class DesktopBridge:
                 pending = database.execute("SELECT COUNT(*) FROM deliveries WHERE device_id=? AND state='pending'", (target,)).fetchone()[0]
                 if pending >= MAX_PENDING:
                     raise BridgeError("this phone has 200 pending proposals; review those before staging another", 409)
-                database.execute("INSERT OR IGNORE INTO proposals VALUES(?,?,?,?)", (identifier, digest, body, time.time()))
+                database.execute("INSERT OR IGNORE INTO proposals(proposal_id,digest,body,created_at,format,version) VALUES(?,?,?,?,?,1)", (identifier, digest, body, time.time(), proposal_format))
                 database.execute("INSERT INTO deliveries VALUES(?,?,?,NULL,?)", (identifier, target, "pending", time.time()))
         return self.get_plan_receipt(identifier, target)
 
-    def pending_proposals(self, device: str) -> dict[str, Any]:
+    def pending_board_proposals(self, device: str) -> dict[str, Any]:
+        self._require_board_capability(device)
+        return self.pending_proposals(device, BOARD_FORMAT)
+
+    def pending_proposals(self, device: str, proposal_format: str = PLAN_FORMAT) -> dict[str, Any]:
         # Bounded response batches; acknowledged rows disappear from this queue.
         result: dict[str, Any] = {"proposals": []}
         with self.connection() as database:
-            rows = database.execute("SELECT p.body,p.digest FROM proposals p JOIN deliveries d ON p.proposal_id=d.proposal_id WHERE d.device_id=? AND d.state='pending' ORDER BY p.created_at,p.proposal_id", (device,))
+            rows = database.execute("SELECT p.body,p.digest FROM proposals p JOIN deliveries d ON p.proposal_id=d.proposal_id WHERE d.device_id=? AND d.state='pending' AND p.format=? ORDER BY p.created_at,p.proposal_id", (device, proposal_format))
             for row in rows:
                 candidate = {"proposal": json.loads(row["body"]), "proposalDigest": row["digest"], "status": "pending"}
                 result["proposals"].append(candidate)
@@ -371,6 +437,24 @@ class DesktopBridge:
         with self.connection() as database:
             database.execute("INSERT INTO contexts VALUES(?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET body=excluded.body,captured_at=excluded.captured_at,received_at=excluded.received_at", (device, canonical_json(context), context["capturedAt"], time.time()))
         return {"status": "context_shared", "deviceID": device, "capturedAt": context["capturedAt"]}
+
+    def share_board_context(self, device: str, value: Any) -> dict[str, Any]:
+        self._require_board_capability(device)
+        context = validate_board_context(value)
+        with self.connection() as database:
+            database.execute("INSERT INTO board_contexts VALUES(?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET body=excluded.body,captured_at=excluded.captured_at,received_at=excluded.received_at", (device, canonical_json(context), context["capturedAt"], time.time()))
+        return {"status": "context_shared", "deviceID": device, "capturedAt": context["capturedAt"]}
+
+    def get_shared_semester_board_context(self, target_device_id: str | None = None) -> dict[str, Any]:
+        if target_device_id is None:
+            raise BridgeError("Semester Board context requires an explicit targetDeviceID")
+        target = self.target_device(target_device_id)
+        self._require_board_capability(target)
+        with self.connection() as database:
+            row = database.execute("SELECT body,received_at FROM board_contexts WHERE device_id=?", (target,)).fetchone()
+        return {"status": "shared_context" if row else "no_shared_context", "targetDeviceID": target,
+                "context": json.loads(row["body"]) if row else None, "receivedAt": utc_string(row["received_at"]) if row else None,
+                "calendarCoverage": "unknown", "message": "Explicitly shared selected board snapshot, not live app state. Only disclosed week progress/notes are included. Omitted fields remain unknown; do not overwrite them with defaults. No planner, habit, profile, Calendar or credential history is shared."}
 
     def disconnect(self, device: str, value: Any) -> dict[str, Any]:
         _object(value, "disconnect", set())

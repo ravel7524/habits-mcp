@@ -5,7 +5,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from .tools import propose_academic_plan
+from .tools import propose_academic_plan, propose_semester_board
 from .validator import MAX_BYTES, PlanValidationError
 
 
@@ -17,11 +17,13 @@ def main() -> None:
     http.add_argument("--port", type=int, default=8765)
     validate = commands.add_parser("validate", help="Validate a UTF-8 JSON file without the MCP dependency.")
     validate.add_argument("path", type=Path)
+    board = commands.add_parser("validate-board", help="Validate a separate Semester Board proposal without applying it.")
+    board.add_argument("path", type=Path)
     args = parser.parse_args()
     try:
-        if args.command == "validate":
+        if args.command in {"validate", "validate-board"}:
             with args.path.open("rb") as handle:
-                result = propose_academic_plan(handle.read(MAX_BYTES + 1))
+                result = (propose_semester_board if args.command == "validate-board" else propose_academic_plan)(handle.read(MAX_BYTES + 1))
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.command == "http":
             if not 1 <= args.port <= 65535:

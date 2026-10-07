@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "habits-desktop-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local MCP academic proposals and a private paired-phone review bridge"
 readme = "README.md"
 requires-python = ">=3.10"

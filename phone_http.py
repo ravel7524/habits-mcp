@@ -16,6 +16,9 @@ PROPOSALS_PATH = "/v1/assistant/proposals"
 RECEIPT_PATH = "/v1/assistant/receipt"
 CONTEXT_PATH = "/v1/assistant/context"
 DISCONNECT_PATH = "/v1/assistant/disconnect"
+CAPABILITIES_PATH = "/v1/assistant/capabilities"
+BOARD_PROPOSALS_PATH = "/v1/assistant/board-proposals"
+BOARD_CONTEXT_PATH = "/v1/assistant/board-context"
 
 
 class _PrivateTLSServer(ThreadingHTTPServer):
@@ -90,7 +93,7 @@ class _PhoneHandler(BaseHTTPRequestHandler):
             private_bind(self.client_address[0])
             if "?" in self.path or "#" in self.path:
                 raise BridgeError("query parameters are not supported", 404)
-            routes = {("POST", PAIR_PATH), ("GET", PROPOSALS_PATH), ("POST", RECEIPT_PATH), ("POST", CONTEXT_PATH), ("POST", DISCONNECT_PATH)}
+            routes = {("POST", PAIR_PATH), ("GET", PROPOSALS_PATH), ("POST", RECEIPT_PATH), ("POST", CONTEXT_PATH), ("POST", DISCONNECT_PATH), ("POST", CAPABILITIES_PATH), ("GET", BOARD_PROPOSALS_PATH), ("POST", BOARD_CONTEXT_PATH)}
             if (self.command, self.path) not in routes:
                 raise BridgeError("unsupported phone route", 404)
             if self.headers.get("Transfer-Encoding") is not None:
@@ -104,7 +107,7 @@ class _PhoneHandler(BaseHTTPRequestHandler):
                 length = int(lengths[0]) if lengths else 0
             except ValueError as error:
                 raise BridgeError("invalid Content-Length") from error
-            limit = MAX_BYTES if self.path == CONTEXT_PATH else 8192
+            limit = MAX_BYTES if self.path in {CONTEXT_PATH, BOARD_CONTEXT_PATH} else 8192
             if length < 0 or length > limit or (self.command == "GET" and length != 0):
                 raise BridgeError("phone request body exceeds its permitted size", 413)
             if self.command == "POST" and self.headers.get_content_type() != "application/json":
@@ -126,6 +129,12 @@ class _PhoneHandler(BaseHTTPRequestHandler):
                     result = bridge.acknowledge(device, _read(body))
                 elif self.path == DISCONNECT_PATH:
                     result = bridge.disconnect(device, _read(body))
+                elif self.path == CAPABILITIES_PATH:
+                    result = bridge.register_capabilities(device, _read(body))
+                elif self.path == BOARD_PROPOSALS_PATH:
+                    result = bridge.pending_board_proposals(device)
+                elif self.path == BOARD_CONTEXT_PATH:
+                    result = bridge.share_board_context(device, _read(body))
                 else:
                     result = bridge.share_context(device, _read(body))
             self._reply(200, result)

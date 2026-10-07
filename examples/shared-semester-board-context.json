@@ -1,0 +1,71 @@
+{
+  "format": "habits.semester-board-context",
+  "version": 1,
+  "capturedAt": "2026-10-06T12:00:00Z",
+  "boardDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "notesIncluded": true,
+  "weekProgressIncluded": true,
+  "semester": {
+    "schemaVersion": 3,
+    "id": "22222222-2222-4222-8222-222222222222",
+    "title": "Synthetic course-week board",
+    "weekCount": 14,
+    "startDate": "2026-09-14",
+    "endDate": "2026-12-18",
+    "timeZoneIdentifier": "Europe/Zurich",
+    "showExamWeeks": true,
+    "statuses": [
+      {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "name": "Recorded done",
+        "colorHex": "#28A35A"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "name": "Revisit",
+        "colorHex": "#E9C52F"
+      }
+    ],
+    "courses": [
+      {
+        "id": "33333333-3333-4333-8333-333333333333",
+        "name": "Synthetic statistics",
+        "moduleCode": "QA-STAT",
+        "activeWeeks": [
+          1,
+          2,
+          14,
+          52
+        ],
+        "entries": {
+          "1": {
+            "statusID": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "notes": "Synthetic recorded week note"
+          },
+          "52": {
+            "notes": "Retained hidden week"
+          }
+        },
+        "assessments": [
+          {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "title": "Legacy scoped exam identity",
+            "kind": "exam",
+            "dueDate": "2026-12-16",
+            "dueTime": "09:00",
+            "notes": "Synthetic exam note",
+            "state": "pending"
+          },
+          {
+            "id": "55555555-5555-4555-8555-555555555555",
+            "title": "Recorded completed essay",
+            "kind": "essay",
+            "dueDate": "2026-10-01",
+            "state": "completed",
+            "completedAt": 812160000.0
+          }
+        ]
+      }
+    ]
+  }
+}

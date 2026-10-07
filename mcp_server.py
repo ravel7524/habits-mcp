@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .tools import get_plan_format, propose_academic_plan
+from .tools import get_plan_format, propose_academic_plan, get_semester_board_format, propose_semester_board
 from .validator import MAX_BYTES, PlanValidationError
 
 
@@ -48,6 +48,14 @@ def build_server(bridge: Any | None = None) -> Any:
             annotations=annotations,
         ),
     ]
+    board_schema = get_semester_board_format()["schema"]
+    board_shape = {key: value for key, value in board_schema.items() if key not in {"$schema", "$id", "$defs"}}
+    tools += [
+        Tool(name="get_semester_board_format", description="Return the separate strict Semester Board merge schema, synthetic example and privacy/Undo rules. Never changes phone data.",
+             input_schema={"type": "object", "properties": {}, "additionalProperties": False}, annotations=annotations),
+        Tool(name="propose_semester_board", description="Validate an additive/update-only schema-3 board proposal for phone preview/confirmation. Omitted fields survive; existing board changes need its explicitly shared digest.",
+             input_schema={"type": "object", "properties": {"proposal": board_shape}, "required": ["proposal"], "additionalProperties": False, "$defs": board_schema["$defs"]}, annotations=annotations),
+    ]
     if bridge is not None:
         readonly = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
         mutable = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
@@ -63,6 +71,8 @@ def build_server(bridge: Any | None = None) -> Any:
             "stage_academic_plan": "Validate and stage an immutable academic proposal for one paired phone to fetch and review. This does not apply it. Report pending until get_plan_receipt returns the phone's applied receipt. Supply targetDeviceID when multiple phones are paired.",
             "get_plan_receipt": "Read the paired phone's receipt for a staged proposal. Distinguish pending, applied, undone, rejected, and not_found literally; never infer application from staging.",
             "revoke_device": "Revoke a lost/offline phone's bridge credential by deviceID, preserving all academic snapshots and proposal history. The phone must pair again with a fresh invite to restore access.",
+            "stage_semester_board": "Stage a strict Semester Board merge for one explicitly named, capability-advertising Android phone. It stays pending until phone review/confirmation and receipt; it cannot modify phone records itself.",
+            "get_shared_semester_board_context": "Read one explicitly targeted phone's selected board snapshot with disclosed week-progress/notes consent. Missing fields stay unknown; no planner/habit/profile/Calendar or credentials. Snapshot digest guards edits but is not write authorization.",
         }
         inputs = {
             "desktop_status": arguments({}), "create_pairing_invite": arguments({}),
@@ -70,9 +80,11 @@ def build_server(bridge: Any | None = None) -> Any:
             "stage_academic_plan": {**arguments({"proposal": proposal_shape, **target}, ["proposal"]), "$defs": schema["$defs"]},
             "get_plan_receipt": arguments({"proposalID": schema["$defs"]["uuid"], **target}, ["proposalID"]),
             "revoke_device": arguments({"deviceID": schema["$defs"]["uuid"]}, ["deviceID"]),
+            "stage_semester_board": {**arguments({"proposal": board_shape, **target}, ["proposal", "targetDeviceID"]), "$defs": board_schema["$defs"]},
+            "get_shared_semester_board_context": arguments(target, ["targetDeviceID"]),
         }
         for name, description in descriptions.items():
-            hint = readonly if name in {"desktop_status", "get_shared_academic_context", "get_plan_receipt"} else mutable
+            hint = readonly if name in {"desktop_status", "get_shared_academic_context", "get_shared_semester_board_context", "get_plan_receipt"} else mutable
             if name == "create_pairing_invite":
                 hint = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
             tools.append(Tool(name=name, description=description, input_schema=inputs[name], output_schema={"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}}, "required": ["status", "message"]}, annotations=hint))
@@ -91,6 +103,14 @@ def build_server(bridge: Any | None = None) -> Any:
                 if type(arguments) is not dict or set(arguments) != {"proposal"}:
                     raise PlanValidationError("arguments: exactly one proposal object is required")
                 result = propose_academic_plan(arguments["proposal"])
+            elif params.name == "get_semester_board_format":
+                if arguments != {}:
+                    raise PlanValidationError("arguments: get_semester_board_format accepts no arguments")
+                result = get_semester_board_format()
+            elif params.name == "propose_semester_board":
+                if type(arguments) is not dict or set(arguments) != {"proposal"}:
+                    raise PlanValidationError("arguments: exactly one proposal object is required")
+                result = propose_semester_board(arguments["proposal"])
             elif bridge is not None and params.name in descriptions:
                 from .validator import _object
                 required = set(inputs[params.name]["required"])
@@ -107,6 +127,10 @@ def build_server(bridge: Any | None = None) -> Any:
                     result = bridge.get_shared_academic_context(target_id)
                 elif params.name == "stage_academic_plan":
                     result = bridge.stage_academic_plan(arguments["proposal"], target_id)
+                elif params.name == "stage_semester_board":
+                    result = bridge.stage_semester_board(arguments["proposal"], target_id)
+                elif params.name == "get_shared_semester_board_context":
+                    result = bridge.get_shared_semester_board_context(target_id)
                 elif params.name == "revoke_device":
                     result = bridge.revoke_device(arguments["deviceID"])
                 else:
@@ -122,7 +146,7 @@ def build_server(bridge: Any | None = None) -> Any:
         return CallToolResult(content=[TextContent(type="text", text=json.dumps(result, ensure_ascii=False))], structured_content=result)
 
     return Server(
-        "Habits academic proposals", version="1.0.0", on_list_tools=list_tools, on_call_tool=call_tool,
+        "Habits academic proposals", version="0.2.0", on_list_tools=list_tools, on_call_tool=call_tool,
         instructions="This server validates portable academic-plan proposals and, when explicitly enabled, stages them for a private paired phone. Staging is pending until a phone receipt reports applied. It cannot directly apply phone changes. Shared academic context is a possibly stale user-approved snapshot. Omitted assessment state is unknown, never pending; do not schedule preparation for recorded completed/dismissed assessments unless explicitly requested. Calendar coverage remains unknown for empty/terminal-only snapshots. Never invent dates or claim pending means applied.",
     )
 

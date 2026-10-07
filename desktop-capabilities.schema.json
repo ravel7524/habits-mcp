@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "habits.desktop-capabilities"
+    },
+    "version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "platform": {
+      "enum": [
+        "android",
+        "ios"
+      ]
+    },
+    "proposalFormats": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "enum": [
+              "habits.academic-plan",
+              "habits.semester-board-proposal"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "const": 1
+          }
+        },
+        "required": [
+          "format",
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "platform",
+    "proposalFormats"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:habits:desktop-capabilities:1"
+}

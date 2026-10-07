@@ -21,7 +21,7 @@ def main() -> None:
     parser.add_argument("--phone-bridge", action="store_true", help="Explicitly enable the TLS phone bridge on loopback (127.0.0.1 by default).")
     parser.add_argument("--phone-port", type=int, default=8766)
     parser.add_argument("--data-dir", type=Path, default=None, help="Dedicated private bridge state directory; no global client configuration is changed.")
-    parser.add_argument("--version", action="version", version="habits-desktop-mcp 0.1.0")
+    parser.add_argument("--version", action="version", version="habits-desktop-mcp 0.2.0")
     args = parser.parse_args()
     if not 1 <= args.phone_port <= 65535:
         parser.error("phone-port must be 1 through 65535")
